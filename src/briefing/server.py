@@ -5,7 +5,7 @@ import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-from briefing.config import Config
+from briefing.config import parse_query_params
 from briefing.feeds import extract_feed_urls, fetch_headlines
 from briefing.curator import curate
 from briefing.render import render_html, render_empty_state
@@ -19,13 +19,28 @@ class _BriefingHandler(BaseHTTPRequestHandler):
     # Set by BriefingServer before starting
     cache: str = ""
     server_title: str = "AI Briefing"
+    last_refresh: float = 0.0
+    # Shared config dict populated by the most recent GET / request.
+    # The refresh thread reads it.  Starts as pure defaults.
+    latest_config: dict[str, str] = {}
+    config_lock: threading.Lock = threading.Lock()
 
     def do_GET(self) -> None:
         if self.path == "/health":
             self._send_plain(200, "ok")
             return
 
-        if self.path == "/":
+        if self.path == "/" or self.path.startswith("/?"):
+            # Parse query parameters (Glance's ``parameters`` block)
+            # and update the shared config for the refresh thread.
+            config = parse_query_params(self.path)
+            with self.config_lock:
+                _BriefingHandler.latest_config = config
+            age = time.time() - self.last_refresh if self.last_refresh else -1
+            if age >= 0:
+                logger.info("GET / — serving cached response (%.0fs ago)", age)
+            else:
+                logger.info("GET / — serving empty state (not yet refreshed)")
             self._send_html(200, self.cache)
             return
 
@@ -59,23 +74,26 @@ class BriefingServer:
 
     The background thread re-parses Glance config, fetches headlines,
     sends them to DeepSeek, and updates the cache on every cycle.
+
+    Configuration is read from query parameters (Glance's ``parameters``
+    block) on each GET request and applied on the next refresh cycle.
     """
 
     def __init__(
-        self, config: Config, api_key: str, port: int | None = None
+        self, api_key: str, host: str = "127.0.0.1", port: int = 8080
     ) -> None:
-        self.config = config
-        self.api_key = api_key
+        self._api_key = api_key
         self._cache = render_empty_state()
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._refresh_thread: threading.Thread | None = None
 
-        # Ensure the handler class reflects the initial cache
+        # Seed the handler's shared config with defaults so the refresh
+        # thread has something to use before the first request arrives.
+        _BriefingHandler.latest_config = parse_query_params("/")
+        _BriefingHandler.config_lock = threading.Lock()
         _BriefingHandler.cache = self._cache
 
-        host = config.server.host
-        port = port if port is not None else config.server.port
         self._httpd = HTTPServer((host, port), _BriefingHandler)
 
     @property
@@ -87,6 +105,7 @@ class BriefingServer:
         with self._lock:
             self._cache = html
         _BriefingHandler.cache = html
+        _BriefingHandler.last_refresh = time.time()
 
     def serve_forever(self) -> None:
         """Start the HTTP server and background refresh thread.
@@ -111,9 +130,10 @@ class BriefingServer:
 
     def refresh_now(self) -> None:
         """Run the full pipeline immediately. Called by the background thread."""
+        config = _BriefingHandler.latest_config
         try:
             logger.info("Refresh cycle starting")
-            feed_urls = extract_feed_urls(self.config.glance_config)
+            feed_urls = extract_feed_urls(config["glance_config"])
             if not feed_urls:
                 logger.warning("No RSS feeds found in Glance config")
                 if "<p" not in self.cache:
@@ -121,7 +141,7 @@ class BriefingServer:
                 return
 
             headlines, fetched = fetch_headlines(
-                feed_urls, limit=self.config.curation.headlines_per_feed
+                feed_urls, limit=int(config["headlines_per_feed"])
             )
             logger.info("Fetched %d headlines from %d/%d feeds",
                         len(headlines), fetched, len(feed_urls))
@@ -130,12 +150,7 @@ class BriefingServer:
                 logger.warning("No headlines fetched — keeping previous cache")
                 return
 
-            stories = curate(
-                headlines,
-                self.config.ai,
-                self.config.curation.story_count,
-                self.api_key,
-            )
+            stories = curate(headlines, config, self._api_key)
             if stories:
                 html = render_html(stories)
                 self.set_cache(html)
@@ -150,7 +165,9 @@ class BriefingServer:
         def _loop() -> None:
             # Run first refresh immediately
             self.refresh_now()
-            while not self._stop_event.wait(self.config.refresh_interval):
+            while not self._stop_event.wait(
+                int(_BriefingHandler.latest_config["refresh_interval"])
+            ):
                 self.refresh_now()
 
         self._refresh_thread = threading.Thread(target=_loop, daemon=True)

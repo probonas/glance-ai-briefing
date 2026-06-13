@@ -5,8 +5,6 @@ import textwrap
 
 import requests
 
-from briefing.config import AIConfig
-
 
 def build_prompt(headlines: list[dict], story_count: int) -> str:
     """Build the curation prompt from fetched headlines."""
@@ -31,8 +29,13 @@ def build_prompt(headlines: list[dict], story_count: int) -> str:
     """).strip()
 
 
-def call_deepseek(prompt: str, ai_config: AIConfig, api_key: str) -> list[dict]:
+def call_deepseek(prompt: str, config: dict[str, str], api_key: str) -> list[dict]:
     """Send the prompt to DeepSeek and parse the JSON response.
+
+    Args:
+        prompt: The curation prompt.
+        config: Config dict from :func:`~briefing.config.parse_query_params`.
+        api_key: DeepSeek API key.
 
     Raises:
         requests.exceptions.RequestException: on HTTP errors or timeouts.
@@ -40,17 +43,17 @@ def call_deepseek(prompt: str, ai_config: AIConfig, api_key: str) -> list[dict]:
         ValueError: if the parsed result is not a list.
     """
     response = requests.post(
-        ai_config.api_url,
+        config["api_url"],
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
         json={
-            "model": ai_config.model,
+            "model": config["model"],
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": ai_config.temperature,
+            "temperature": float(config["temperature"]),
         },
-        timeout=ai_config.timeout_seconds,
+        timeout=int(config["timeout_seconds"]),
     )
     response.raise_for_status()
     content = response.json()["choices"][0]["message"]["content"].strip()
@@ -68,8 +71,15 @@ def call_deepseek(prompt: str, ai_config: AIConfig, api_key: str) -> list[dict]:
 
 
 def curate(
-    headlines: list[dict], ai_config: AIConfig, story_count: int, api_key: str
+    headlines: list[dict], config: dict[str, str], api_key: str
 ) -> list[dict]:
-    """Full curation pipeline: build prompt, call API, return stories."""
+    """Full curation pipeline: build prompt, call API, return stories.
+
+    Args:
+        headlines: List of headline dicts from :func:`~briefing.feeds.fetch_headlines`.
+        config: Config dict from :func:`~briefing.config.parse_query_params`.
+        api_key: DeepSeek API key.
+    """
+    story_count = int(config["story_count"])
     prompt = build_prompt(headlines, story_count)
-    return call_deepseek(prompt, ai_config, api_key)
+    return call_deepseek(prompt, config, api_key)

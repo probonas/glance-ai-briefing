@@ -1,118 +1,55 @@
-"""Configuration loading with defaults and YAML file support."""
+"""Configuration from Glance extension query parameters with defaults.
+
+Glance passes the ``parameters`` block from ``glance.yml`` as query-string
+parameters on every request.  This module provides a single function that
+extracts those parameters and fills in sensible defaults.
+
+The Glance config path (for RSS feed discovery) is *not* a query parameter
+— it comes from the ``GLANCE_CONFIG`` environment variable or the hard-coded
+default, because the config file is mounted into the container.
+"""
 
 import os
-from dataclasses import dataclass, field
-from pathlib import Path
-
-import yaml
+from urllib.parse import urlparse, parse_qs
 
 _DEFAULT_GLANCE_CONFIG = os.path.expanduser("~/glance-config/config/home.yml")
 
-
-@dataclass(frozen=True)
-class AIConfig:
-    provider: str = "deepseek"
-    model: str = "deepseek-chat"
-    api_url: str = "https://api.deepseek.com/v1/chat/completions"
-    temperature: float = 0.3
-    timeout_seconds: int = 30
-
-
-@dataclass(frozen=True)
-class CurationConfig:
-    story_count: int = 3
-    headlines_per_feed: int = 4
+# All values are stored as strings so the parsing is uniform.  Consumers
+# coerce to the expected type on use (e.g. int, float, bool).
+DEFAULTS: dict[str, str] = {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "api_url": "https://api.deepseek.com/v1/chat/completions",
+    "temperature": "0.3",
+    "timeout_seconds": "30",
+    "story_count": "3",
+    "headlines_per_feed": "4",
+    "refresh_interval": "14400",
+}
 
 
-@dataclass(frozen=True)
-class ServerConfig:
-    host: str = "127.0.0.1"
-    port: int = 8080
+def get_glance_config_path() -> str:
+    """Return the Glance config path from env var or default."""
+    return os.environ.get("GLANCE_CONFIG", _DEFAULT_GLANCE_CONFIG)
 
 
-@dataclass(frozen=True)
-class Config:
-    glance_config: str = field(
-        default_factory=lambda: os.environ.get(
-            "GLANCE_CONFIG",
-            _DEFAULT_GLANCE_CONFIG,
-        )
-    )
-    ai: AIConfig = field(default_factory=AIConfig)
-    curation: CurationConfig = field(default_factory=CurationConfig)
-    refresh_interval: int = 14400
-    server: ServerConfig = field(default_factory=ServerConfig)
-
-
-def _discover_config_path(cli_path: str | None = None) -> str | None:
-    """Find the first existing config file from:
-    1. CLI flag (--config)
-    2. ./briefing.yml
-    3. ~/.config/briefing/briefing.yml
-    Returns None if no file found.
-    """
-    if cli_path and Path(cli_path).exists():
-        return cli_path
-    if Path("briefing.yml").exists():
-        return "briefing.yml"
-    home_config = Path.home() / ".config" / "briefing" / "briefing.yml"
-    if home_config.exists():
-        return str(home_config)
-    return None
-
-
-def _deep_merge(base: dict, override: dict) -> dict:
-    """Recursively merge override into base. Lists are replaced, not merged."""
-    result = dict(base)
-    for key, value in override.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = _deep_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
-
-
-def load_config(cli_path: str | None = None) -> Config:
-    """Load configuration from YAML file and apply defaults.
+def parse_query_params(path: str) -> dict[str, str]:
+    """Extract config from a URL path's query string, falling back to defaults.
 
     Args:
-        cli_path: Optional path from --config CLI flag.
+        path: Full request path including query string, e.g.
+              ``/?story_count=5&model=deepseek-reasoner``.
 
     Returns:
-        Config with all values set (defaults + file overrides).
+        Dict with all known keys set (including ``glance_config`` populated
+        from the env var / default, not from query params).
     """
-    defaults = {
-        "glance_config": os.environ.get("GLANCE_CONFIG", _DEFAULT_GLANCE_CONFIG),
-        "ai": {
-            "provider": "deepseek",
-            "model": "deepseek-chat",
-            "api_url": "https://api.deepseek.com/v1/chat/completions",
-            "temperature": 0.3,
-            "timeout_seconds": 30,
-        },
-        "curation": {
-            "story_count": 3,
-            "headlines_per_feed": 4,
-        },
-        "refresh_interval": 14400,
-        "server": {
-            "host": "127.0.0.1",
-            "port": 8080,
-        },
-    }
+    parsed = urlparse(path)
+    params = parse_qs(parsed.query, keep_blank_values=True)
 
-    config_path = _discover_config_path(cli_path)
-    if config_path:
-        with open(config_path) as f:
-            user = yaml.safe_load(f) or {}
-        merged = _deep_merge(defaults, user)
-    else:
-        merged = defaults
-
-    return Config(
-        glance_config=merged["glance_config"],
-        ai=AIConfig(**merged["ai"]),
-        curation=CurationConfig(**merged["curation"]),
-        refresh_interval=merged["refresh_interval"],
-        server=ServerConfig(**merged["server"]),
-    )
+    config = dict(DEFAULTS)
+    config["glance_config"] = get_glance_config_path()
+    for key in DEFAULTS:
+        if key in params:
+            config[key] = params[key][-1]  # last value wins for duplicates
+    return config
