@@ -68,3 +68,26 @@ def test_render_html_escapes_no_style_block():
     ]
     html = render_html(stories)
     assert "<style>" not in html
+
+
+def test_render_html_with_config_dict():
+    """Accepts optional config dict with timezone for timestamp rendering."""
+    stories = [
+        {"headline": "Test Story", "source": "Src", "url": "#", "summary": "Sum"},
+    ]
+    config = {"timezone": "America/New_York"}
+    html = render_html(stories, config)
+    assert "AI Briefing" in html
+    assert "color-primary-if-not-visited" in html
+    assert "Test Story" in html
+
+
+def test_render_html_without_config_backward_compat():
+    """Calling render_html without config still works (backward compat)."""
+    stories = [
+        {"headline": "Backward", "source": "Compat", "url": "#", "summary": "Works"},
+    ]
+    html = render_html(stories)
+    assert "AI Briefing" in html
+    assert "color-primary-if-not-visited" in html
+    assert "Backward" in html

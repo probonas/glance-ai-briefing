@@ -14,6 +14,9 @@ def test_all_defaults_when_no_query_string():
     assert config["story_count"] == "3"
     assert config["headlines_per_feed"] == "4"
     assert config["refresh_interval"] == "14400"
+    assert config["timezone"] == "Europe/Athens"
+    assert config["silent_hours_start"] == "00:00"
+    assert config["silent_hours_end"] == "08:00"
     assert config["glance_config"] == os.path.expanduser(
         "~/glance-config/config/home.yml"
     )
@@ -29,6 +32,17 @@ def test_query_params_override_defaults():
     assert config["temperature"] == "0.7"
     assert config["provider"] == "deepseek"
     assert config["timeout_seconds"] == "30"
+
+
+def test_silent_hours_override_via_query():
+    """Silent hours defaults can be overridden via query parameters."""
+    config = parse_query_params(
+        "/?silent_hours_start=22:00&silent_hours_end=06:00&timezone=America/New_York"
+    )
+    assert config["silent_hours_start"] == "22:00"
+    assert config["silent_hours_end"] == "06:00"
+    assert config["timezone"] == "America/New_York"
+    assert config["story_count"] == "3"  # other defaults still apply
 
 
 def test_partial_params_still_get_defaults():

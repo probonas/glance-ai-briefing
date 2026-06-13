@@ -3,6 +3,9 @@
 import logging
 import threading
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from briefing.config import parse_query_params
@@ -152,13 +155,32 @@ class BriefingServer:
 
             stories = curate(headlines, config, self._api_key)
             if stories:
-                html = render_html(stories)
+                html = render_html(stories, config)
                 self.set_cache(html)
                 logger.info("Refresh complete — %d stories cached", len(stories))
             else:
                 logger.warning("No stories returned from AI — keeping previous cache")
         except Exception:
             logger.exception("Refresh cycle failed")
+
+    @classmethod
+    def is_silent_hours(cls, now: datetime | None = None) -> bool:
+        """Check whether *now* falls within the configured silent hours.
+
+        Args:
+            now: Optional datetime to check.  Defaults to the current time
+                in the configured timezone.
+
+        Returns:
+            True if *now* is within the silent-hours window (inclusive on
+            both ends), False otherwise.
+        """
+        config = _BriefingHandler.latest_config
+        if now is None:
+            now = datetime.now(ZoneInfo(config["timezone"]))
+        start = datetime.strptime(config["silent_hours_start"], "%H:%M").time()
+        end = datetime.strptime(config["silent_hours_end"], "%H:%M").time()
+        return start <= now.time() <= end
 
     def _start_refresh_thread(self) -> None:
         """Start the background refresh loop in a daemon thread."""
@@ -168,7 +190,8 @@ class BriefingServer:
             while not self._stop_event.wait(
                 int(_BriefingHandler.latest_config["refresh_interval"])
             ):
-                self.refresh_now()
+                if not BriefingServer.is_silent_hours():
+                    self.refresh_now()
 
         self._refresh_thread = threading.Thread(target=_loop, daemon=True)
         self._refresh_thread.start()

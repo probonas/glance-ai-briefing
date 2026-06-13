@@ -5,16 +5,21 @@ https://github.com/glanceapp/glance/blob/main/docs/extensions.md
 """
 
 from datetime import datetime
+from typing import Optional
+from zoneinfo import ZoneInfo
 
 
-def render_html(stories: list[dict]) -> str:
+def render_html(stories: list[dict], config: Optional[dict[str, str]] = None) -> str:
     """Render curated stories as an HTML fragment using Glance native classes.
 
     Returns a <ul> with <li> per story matching Glance's existing
     RSS/feed widget structure. No <style> blocks — styling comes from
     Glance's built-in theme.
     """
-    now = datetime.now().strftime("%a %d %b, %H:%M")
+    if config is None:
+        config = {}
+
+    now = datetime.now(ZoneInfo(config.get('timezone', 'UTC'))).strftime("%a %d %b, %H:%M")
     items = ""
     for story in stories:
         headline = story.get("headline", "")

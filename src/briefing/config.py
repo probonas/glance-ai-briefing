@@ -25,6 +25,9 @@ DEFAULTS: dict[str, str] = {
     "story_count": "3",
     "headlines_per_feed": "4",
     "refresh_interval": "14400",
+    "timezone": "Europe/Athens",
+    "silent_hours_start": "00:00",
+    "silent_hours_end": "08:00"
 }
 
 

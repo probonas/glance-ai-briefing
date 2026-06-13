@@ -118,3 +118,48 @@ def test_query_params_update_config():
         assert config["refresh_interval"] == "14400"
     finally:
         server.shutdown()
+
+SILENT_CONFIG = {
+    "timezone": "UTC",
+    "silent_hours_start": "00:00",
+    "silent_hours_end": "08:00",
+}
+
+def test_is_silent_hours_inside():
+    """Returns True when current time is inside silent hours."""
+    from briefing.server import BriefingServer, _BriefingHandler
+    from datetime import datetime, timezone
+
+    _BriefingHandler.latest_config = SILENT_CONFIG
+    now = datetime(2026, 6, 13, 3, 0, 0, tzinfo=timezone.utc)
+    assert BriefingServer.is_silent_hours(now=now) is True
+
+
+def test_is_silent_hours_outside():
+    """Returns False when current time is outside silent hours."""
+    from briefing.server import BriefingServer, _BriefingHandler
+    from datetime import datetime, timezone
+
+    _BriefingHandler.latest_config = SILENT_CONFIG
+    now = datetime(2026, 6, 13, 12, 0, 0, tzinfo=timezone.utc)
+    assert BriefingServer.is_silent_hours(now=now) is False
+
+
+def test_is_silent_hours_at_start_boundary():
+    """Returns True when current time equals silent_hours_start (inclusive)."""
+    from briefing.server import BriefingServer, _BriefingHandler
+    from datetime import datetime, timezone
+
+    _BriefingHandler.latest_config = SILENT_CONFIG
+    now = datetime(2026, 6, 13, 0, 0, 0, tzinfo=timezone.utc)
+    assert BriefingServer.is_silent_hours(now=now) is True
+
+
+def test_is_silent_hours_at_end_boundary():
+    """Returns True when current time equals silent_hours_end (inclusive)."""
+    from briefing.server import BriefingServer, _BriefingHandler
+    from datetime import datetime, timezone
+
+    _BriefingHandler.latest_config = SILENT_CONFIG
+    now = datetime(2026, 6, 13, 8, 0, 0, tzinfo=timezone.utc)
+    assert BriefingServer.is_silent_hours(now=now) is True
