@@ -1,10 +1,8 @@
-version: "3"
-
 services:
   briefing:
     build: .
     ports:
-      - "8080:8080"
+      - "8090:8080"
     environment:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - GLANCE_CONFIG=/glance-config/config/home.yml

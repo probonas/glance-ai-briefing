@@ -10,4 +10,4 @@ ENV GLANCE_CONFIG="/glance-config/config/home.yml"
 
 EXPOSE 8080
 
-CMD ["briefing", "serve"]
+CMD ["briefing", "serve", "--host", "0.0.0.0"]
