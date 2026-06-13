@@ -19,7 +19,8 @@ def render_html(stories: list[dict], config: Optional[dict[str, str]] = None) ->
     if config is None:
         config = {}
 
-    now = datetime.now(ZoneInfo(config.get('timezone', 'UTC'))).strftime("%a %d %b, %H:%M")
+    now = datetime.now(ZoneInfo(config.get('timezone', 'UTC')))
+    formatted = now.strftime("%a %d %b, %H:%M %Z")
     items = ""
     for story in stories:
         headline = story.get("headline", "")
@@ -37,7 +38,7 @@ def render_html(stories: list[dict], config: Optional[dict[str, str]] = None) ->
         </li>"""
 
     return f"""<div class="margin-bottom-10">
-    <p class="size-h5 color-primary margin-bottom-10">&#10022; AI Briefing &mdash; {now}</p>
+    <p class="size-h5 color-primary margin-bottom-10">&#10022; AI Briefing &mdash; {formatted}</p>
     <ul class="list list-gap-10 list-with-separator">{items}
     </ul>
 </div>"""

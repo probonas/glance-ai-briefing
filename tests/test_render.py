@@ -91,3 +91,34 @@ def test_render_html_without_config_backward_compat():
     assert "AI Briefing" in html
     assert "color-primary-if-not-visited" in html
     assert "Backward" in html
+
+
+def test_render_html_timezone_shifts_hour():
+    """Timezone config shifts the displayed hour correctly."""
+    from datetime import datetime, timezone
+    import briefing.render
+
+    fixed = datetime(2026, 6, 13, 8, 0, 0, tzinfo=timezone.utc)
+
+    class _FakeDatetime:
+        """Replaces briefing.render.datetime so .now() returns a fixed time."""
+        @classmethod
+        def now(cls, tz=None):
+            return fixed.astimezone(tz) if tz else fixed
+
+    original = briefing.render.datetime
+    briefing.render.datetime = _FakeDatetime
+    try:
+        stories = [{"headline": "H", "source": "S", "url": "#", "summary": "S"}]
+
+        html_utc = render_html(stories)
+        assert "08:00 UTC" in html_utc
+
+        html_athens = render_html(stories, {"timezone": "Europe/Athens"})
+        assert "11:00 EEST" in html_athens
+
+        html_ny = render_html(stories, {"timezone": "America/New_York"})
+        assert "04:00" in html_ny
+        assert "EDT" in html_ny or "EST" in html_ny
+    finally:
+        briefing.render.datetime = original
