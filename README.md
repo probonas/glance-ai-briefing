@@ -4,6 +4,8 @@ An AI-curated news briefing extension for [Glance](https://github.com/glanceapp/
 Fetches headlines from RSS feeds configured in Glance, asks an LLM to pick the
 most significant stories, and serves styled HTML through Glance's extension protocol.
 
+![Screenshot](docs/screenshot-home-full.png)
+
 ## Quick start
 
 ### 1. Install
