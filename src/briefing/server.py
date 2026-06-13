@@ -163,7 +163,8 @@ class BriefingServer:
         except Exception:
             logger.exception("Refresh cycle failed")
 
-    def is_silent_hours(now: datetime | None = None) -> bool:
+    @classmethod
+    def is_silent_hours(cls, now: datetime | None = None) -> bool:
         """Check whether *now* falls within the configured silent hours.
 
         Args:
