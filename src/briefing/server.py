@@ -191,6 +191,8 @@ class BriefingServer:
             ):
                 if not self.is_silent_hours():
                     self.refresh_now()
+                else:
+                    logger.info("Silent hours. Skipped refreshing...")
 
         self._refresh_thread = threading.Thread(target=_loop, daemon=True)
         self._refresh_thread.start()
