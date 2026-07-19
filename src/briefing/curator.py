@@ -1,9 +1,8 @@
-"""DeepSeek prompt building, API call, and response parsing."""
+"""LLM prompt building and curation pipeline."""
 
-import json
 import textwrap
 
-import requests
+from briefing.providers.base import LLMProvider
 
 
 def build_prompt(headlines: list[dict], story_count: int) -> str:
@@ -29,57 +28,20 @@ def build_prompt(headlines: list[dict], story_count: int) -> str:
     """).strip()
 
 
-def call_deepseek(prompt: str, config: dict[str, str], api_key: str) -> list[dict]:
-    """Send the prompt to DeepSeek and parse the JSON response.
-
-    Args:
-        prompt: The curation prompt.
-        config: Config dict from :func:`~briefing.config.parse_query_params`.
-        api_key: DeepSeek API key.
-
-    Raises:
-        requests.exceptions.RequestException: on HTTP errors or timeouts.
-        json.JSONDecodeError: if the response body is not valid JSON.
-        ValueError: if the parsed result is not a list.
-    """
-    response = requests.post(
-        config["api_url"],
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": config["model"],
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": float(config["temperature"]),
-        },
-        timeout=int(config["timeout_seconds"]),
-    )
-    response.raise_for_status()
-    content = response.json()["choices"][0]["message"]["content"].strip()
-
-    # Some models wrap the JSON in markdown code fences
-    if content.startswith("```"):
-        content = content.split("```")[1]
-        if content.startswith("json"):
-            content = content[4:]
-
-    parsed = json.loads(content.strip())
-    if not isinstance(parsed, list):
-        raise ValueError(f"DeepSeek returned {type(parsed)}, expected list")
-    return parsed
-
-
 def curate(
-    headlines: list[dict], config: dict[str, str], api_key: str
+    headlines: list[dict],
+    config: dict[str, str],
+    provider: LLMProvider,
+    api_key: str,
 ) -> list[dict]:
-    """Full curation pipeline: build prompt, call API, return stories.
+    """Full curation pipeline: build prompt, call provider, return stories.
 
     Args:
         headlines: List of headline dicts from :func:`~briefing.feeds.fetch_headlines`.
         config: Config dict from :func:`~briefing.config.parse_query_params`.
-        api_key: DeepSeek API key.
+        provider: LLM provider instance implementing :class:`~briefing.providers.base.LLMProvider`.
+        api_key: API key for the provider.
     """
     story_count = int(config["story_count"])
     prompt = build_prompt(headlines, story_count)
-    return call_deepseek(prompt, config, api_key)
+    return provider.call(prompt, config, api_key)

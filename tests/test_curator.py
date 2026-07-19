@@ -1,7 +1,6 @@
 # tests/test_curator.py
-import json
 from unittest import mock
-from briefing.curator import build_prompt, call_deepseek, curate
+from briefing.curator import build_prompt, curate
 
 
 def test_build_prompt_includes_headlines():
@@ -18,85 +17,16 @@ def test_build_prompt_includes_headlines():
     assert "JSON array with 2 objects" in prompt
 
 
-def test_call_deepseek_parses_valid_json():
-    config = {
-        "api_url": "https://api.deepseek.com/v1/chat/completions",
-        "model": "deepseek-chat",
-        "temperature": "0.3",
-        "timeout_seconds": "10",
-    }
-    fake_response = mock.Mock()
-    fake_response.status_code = 200
-    fake_response.json.return_value = {
-        "choices": [{
-            "message": {
-                "content": json.dumps([
-                    {"headline": "Test", "source": "BBC", "url": "https://x.com", "summary": "Important"},
-                ])
-            }
-        }]
-    }
-    fake_response.raise_for_status = mock.Mock()
-
-    with mock.patch("briefing.curator.requests.post", return_value=fake_response):
-        stories = call_deepseek("test prompt", config, api_key="sk-test")
-        assert len(stories) == 1
-        assert stories[0]["headline"] == "Test"
-
-
-def test_call_deepseek_strips_markdown_fences():
-    config = {
-        "api_url": "https://api.deepseek.com/v1/chat/completions",
-        "model": "deepseek-chat",
-        "temperature": "0.3",
-        "timeout_seconds": "10",
-    }
-    # Some models wrap JSON in ```json ... ``` fences
-    fake_response = mock.Mock()
-    fake_response.status_code = 200
-    fake_response.json.return_value = {
-        "choices": [{
-            "message": {
-                "content": "```json\n" + json.dumps([
-                    {"headline": "Fenced", "source": "X", "url": "https://x.com", "summary": "Yes"},
-                ]) + "\n```"
-            }
-        }]
-    }
-    fake_response.raise_for_status = mock.Mock()
-
-    with mock.patch("briefing.curator.requests.post", return_value=fake_response):
-        stories = call_deepseek("prompt", config, api_key="sk-test")
-        assert len(stories) == 1
-        assert stories[0]["headline"] == "Fenced"
-
-
-def test_curate_orchestrates_pipeline():
-    """curate() is a convenience that builds prompt + calls API."""
-    config = {
-        "api_url": "https://api.deepseek.com/v1/chat/completions",
-        "model": "deepseek-chat",
-        "temperature": "0.3",
-        "timeout_seconds": "10",
-        "story_count": "1",
-    }
-    headlines = [
-        {"title": "News", "url": "https://x.com", "source": "BBC"},
+def test_curate_delegates_to_provider():
+    config = {"story_count": "1", "model": "x", "api_url": "y",
+              "temperature": "0.3", "timeout_seconds": "10"}
+    headlines = [{"title": "News", "url": "https://x.com", "source": "BBC"}]
+    provider = mock.Mock()
+    provider.call.return_value = [
+        {"headline": "Picked", "source": "BBC", "url": "https://x.com", "summary": "Key"},
     ]
-    fake_response = mock.Mock()
-    fake_response.status_code = 200
-    fake_response.json.return_value = {
-        "choices": [{
-            "message": {
-                "content": json.dumps([
-                    {"headline": "Picked", "source": "BBC", "url": "https://x.com", "summary": "Key"},
-                ])
-            }
-        }]
-    }
-    fake_response.raise_for_status = mock.Mock()
-
-    with mock.patch("briefing.curator.requests.post", return_value=fake_response):
-        stories = curate(headlines, config, api_key="sk-test")
-        assert len(stories) == 1
-        assert stories[0]["headline"] == "Picked"
+    stories = curate(headlines, config, provider, api_key="sk-test")
+    assert len(stories) == 1
+    provider.call.assert_called_once()
+    prompt_arg = provider.call.call_args[0][0]
+    assert "BBC" in prompt_arg
