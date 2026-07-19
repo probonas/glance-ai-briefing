@@ -8,10 +8,11 @@ from zoneinfo import ZoneInfo
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-from briefing.config import parse_query_params
+from briefing.config import parse_query_params, apply_provider_defaults
 from briefing.feeds import extract_feed_urls, fetch_headlines
 from briefing.curator import curate
 from briefing.render import render_html, render_empty_state
+from briefing.providers.base import LLMProvider
 
 logger = logging.getLogger("briefing")
 
@@ -76,15 +77,17 @@ class BriefingServer:
     """Manages the HTTP server and background refresh thread.
 
     The background thread re-parses Glance config, fetches headlines,
-    sends them to DeepSeek, and updates the cache on every cycle.
+    sends them to the configured LLM provider, and updates the cache on
+    every cycle.
 
     Configuration is read from query parameters (Glance's ``parameters``
     block) on each GET request and applied on the next refresh cycle.
     """
 
     def __init__(
-        self, api_key: str, host: str = "127.0.0.1", port: int = 8080
+        self, provider: LLMProvider, api_key: str, host: str = "127.0.0.1", port: int = 8080
     ) -> None:
+        self._provider = provider
         self._api_key = api_key
         self._cache = render_empty_state()
         self._lock = threading.Lock()
@@ -133,7 +136,7 @@ class BriefingServer:
 
     def refresh_now(self) -> None:
         """Run the full pipeline immediately. Called by the background thread."""
-        config = _BriefingHandler.latest_config
+        config = apply_provider_defaults(_BriefingHandler.latest_config, self._provider)
         try:
             logger.info("Refresh cycle starting")
             feed_urls = extract_feed_urls(config["glance_config"])
@@ -153,7 +156,7 @@ class BriefingServer:
                 logger.warning("No headlines fetched — keeping previous cache")
                 return
 
-            stories = curate(headlines, config, self._api_key)
+            stories = curate(headlines, config, self._provider, self._api_key)
             if stories:
                 html = render_html(stories, config)
                 self.set_cache(html)

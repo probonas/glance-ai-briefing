@@ -4,6 +4,7 @@ import threading
 import time
 import urllib.request
 from briefing.server import BriefingServer
+from briefing.providers import get_provider
 
 
 def _get_free_port() -> int:
@@ -16,7 +17,7 @@ def _get_free_port() -> int:
 def test_server_returns_extension_headers():
     """GET / returns Widget-Title and Widget-Content-Type headers."""
     port = _get_free_port()
-    server = BriefingServer(api_key="test-key", port=port)
+    server = BriefingServer(get_provider("deepseek"), api_key="test-key", port=port)
 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -37,7 +38,7 @@ def test_server_returns_extension_headers():
 def test_health_endpoint():
     """GET /health returns 200 and 'ok'."""
     port = _get_free_port()
-    server = BriefingServer(api_key="test-key", port=port)
+    server = BriefingServer(get_provider("deepseek"), api_key="test-key", port=port)
 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -56,7 +57,7 @@ def test_health_endpoint():
 def test_initial_cache_is_empty_state():
     """Before any refresh, the server returns the empty state."""
     port = _get_free_port()
-    server = BriefingServer(api_key="test-key", port=port)
+    server = BriefingServer(get_provider("deepseek"), api_key="test-key", port=port)
 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -74,7 +75,7 @@ def test_initial_cache_is_empty_state():
 def test_server_can_set_cache():
     """The server's cache can be updated and subsequent requests see it."""
     port = _get_free_port()
-    server = BriefingServer(api_key="test-key", port=port)
+    server = BriefingServer(get_provider("deepseek"), api_key="test-key", port=port)
 
     server.set_cache("<p>Hello World</p>")
 
@@ -94,7 +95,7 @@ def test_server_can_set_cache():
 def test_query_params_update_config():
     """Query parameters on GET / update the shared config."""
     port = _get_free_port()
-    server = BriefingServer(api_key="test-key", port=port)
+    server = BriefingServer(get_provider("deepseek"), api_key="test-key", port=port)
 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

@@ -18,10 +18,9 @@ block in ``glance.yml`` — no separate config file needed.  Example::
 
 import argparse
 import logging
-import os
 import sys
 
-from briefing.config import parse_query_params
+from briefing.config import parse_query_params, resolve_provider, apply_provider_defaults
 from briefing.feeds import extract_feed_urls, fetch_headlines
 from briefing.curator import curate
 from briefing.render import render_html
@@ -58,20 +57,17 @@ def main() -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        print("ERROR: DEEPSEEK_API_KEY environment variable not set", file=sys.stderr)
-        sys.exit(1)
+    provider, api_key = resolve_provider()
 
     if args.command == "refresh":
-        _cmd_refresh(api_key, args.params)
+        _cmd_refresh(provider, api_key, args.params)
     elif args.command == "serve":
-        _cmd_serve(api_key, host=args.host, port=args.port)
+        _cmd_serve(provider, api_key, host=args.host, port=args.port)
 
 
-def _cmd_refresh(api_key: str, params: str) -> None:
+def _cmd_refresh(provider, api_key: str, params: str) -> None:
     """Run the pipeline once and print the HTML."""
-    config = parse_query_params(f"/?{params}" if params else "/")
+    config = apply_provider_defaults(parse_query_params(f"/?{params}" if params else "/"), provider)
 
     print("Discovering RSS feeds...")
     feed_urls = extract_feed_urls(config["glance_config"])
@@ -90,14 +86,14 @@ def _cmd_refresh(api_key: str, params: str) -> None:
         sys.exit(0)
 
     print("Curating with AI...")
-    stories = curate(headlines, config, api_key)
+    stories = curate(headlines, config, provider, api_key)
     print(render_html(stories))
     print(f"\n--- {len(stories)} stories ---")
 
 
-def _cmd_serve(api_key: str, host: str, port: int) -> None:
+def _cmd_serve(provider, api_key: str, host: str, port: int) -> None:
     """Start the HTTP server."""
-    server = BriefingServer(api_key, host=host, port=port)
+    server = BriefingServer(provider, api_key, host=host, port=port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
