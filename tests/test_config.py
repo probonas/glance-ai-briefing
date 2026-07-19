@@ -1,14 +1,23 @@
 # tests/test_config.py
 import os
-from briefing.config import parse_query_params, get_glance_config_path, DEFAULTS
+import pytest
+from briefing.config import (
+    parse_query_params,
+    get_glance_config_path,
+    resolve_provider,
+    apply_provider_defaults,
+)
+from briefing.providers.deepseek import DeepSeekProvider
+from briefing.providers.google import GoogleProvider
 
+
+# ---------------------------------------------------------------------------
+# Existing tests (updated — provider/model/api_url no longer in DEFAULTS)
+# ---------------------------------------------------------------------------
 
 def test_all_defaults_when_no_query_string():
     """Without any query parameters, all defaults are applied."""
     config = parse_query_params("/")
-    assert config["provider"] == "deepseek"
-    assert config["model"] == "deepseek-chat"
-    assert config["api_url"] == "https://api.deepseek.com/v1/chat/completions"
     assert config["temperature"] == "0.3"
     assert config["timeout_seconds"] == "30"
     assert config["story_count"] == "3"
@@ -20,6 +29,8 @@ def test_all_defaults_when_no_query_string():
     assert config["glance_config"] == os.path.expanduser(
         "~/glance-config/config/home.yml"
     )
+    assert "model" not in config
+    assert "api_url" not in config
 
 
 def test_query_params_override_defaults():
@@ -30,7 +41,6 @@ def test_query_params_override_defaults():
     assert config["story_count"] == "5"
     assert config["model"] == "deepseek-reasoner"
     assert config["temperature"] == "0.7"
-    assert config["provider"] == "deepseek"
     assert config["timeout_seconds"] == "30"
 
 
@@ -49,7 +59,6 @@ def test_partial_params_still_get_defaults():
     """A query string with only some params still applies defaults for others."""
     config = parse_query_params("/?headlines_per_feed=10")
     assert config["headlines_per_feed"] == "10"
-    assert config["model"] == "deepseek-chat"
     assert config["story_count"] == "3"
 
 
@@ -85,4 +94,56 @@ def test_path_without_query_is_ignored():
 def test_health_endpoint_style_path():
     """A path without query string just returns defaults."""
     config = parse_query_params("/health")
-    assert config["provider"] == "deepseek"
+    assert "provider" not in config
+
+
+# ---------------------------------------------------------------------------
+# resolve_provider tests
+# ---------------------------------------------------------------------------
+
+def test_resolve_provider_deepseek_default(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test")
+    provider, api_key = resolve_provider()
+    assert isinstance(provider, DeepSeekProvider)
+    assert api_key == "sk-test"
+
+
+def test_resolve_provider_google(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "google")
+    monkeypatch.setenv("GOOGLE_AI_API_KEY", "google-key")
+    provider, api_key = resolve_provider()
+    assert isinstance(provider, GoogleProvider)
+    assert api_key == "google-key"
+
+
+def test_resolve_provider_missing_key_exits(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    with pytest.raises(SystemExit):
+        resolve_provider()
+
+
+def test_resolve_provider_unknown_exits(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    with pytest.raises(SystemExit):
+        resolve_provider()
+
+
+# ---------------------------------------------------------------------------
+# apply_provider_defaults tests
+# ---------------------------------------------------------------------------
+
+def test_apply_provider_defaults_fills_model_and_url():
+    provider = GoogleProvider()
+    config = parse_query_params("/")
+    result = apply_provider_defaults(config, provider)
+    assert result["model"] == "gemini-2.5-flash"
+    assert "generativelanguage.googleapis.com" in result["api_url"]
+
+
+def test_apply_provider_defaults_query_override_wins():
+    provider = GoogleProvider()
+    config = parse_query_params("/?model=custom-model")
+    result = apply_provider_defaults(config, provider)
+    assert result["model"] == "custom-model"
