@@ -28,6 +28,9 @@ class _BriefingHandler(BaseHTTPRequestHandler):
     # The refresh thread reads it.  Starts as pure defaults.
     latest_config: dict[str, str] = {}
     config_lock: threading.Lock = threading.Lock()
+    # Signalled once when the first GET request updates the config,
+    # so the refresh thread waits for real parameters before its first cycle.
+    config_ready: threading.Event = threading.Event()
 
     def do_GET(self) -> None:
         if self.path == "/health":
@@ -40,6 +43,7 @@ class _BriefingHandler(BaseHTTPRequestHandler):
             config = parse_query_params(self.path)
             with self.config_lock:
                 _BriefingHandler.latest_config = config
+            _BriefingHandler.config_ready.set()
             age = time.time() - self.last_refresh if self.last_refresh else -1
             if age >= 0:
                 logger.info("GET / — serving cached response (%.0fs ago)", age)
@@ -188,7 +192,10 @@ class BriefingServer:
     def _start_refresh_thread(self) -> None:
         """Start the background refresh loop in a daemon thread."""
         def _loop() -> None:
-            # Run first refresh immediately
+            # Wait for the first GET request to deliver real config
+            # before running the first refresh cycle.
+            logger.info("Waiting for Glance config parameters...")
+            _BriefingHandler.config_ready.wait()
             self.refresh_now()
             while not self._stop_event.wait(
                 int(_BriefingHandler.latest_config["refresh_interval"])
