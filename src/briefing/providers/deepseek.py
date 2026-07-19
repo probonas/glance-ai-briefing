@@ -5,7 +5,6 @@ from briefing.providers.base import _call_openai_compatible
 @dataclass(frozen=True)
 class DeepSeekProvider:
     name: str = "deepseek"
-    api_key_env: str = "DEEPSEEK_API_KEY"
     default_model: str = "deepseek-chat"
     default_api_url: str = "https://api.deepseek.com/v1/chat/completions"
 

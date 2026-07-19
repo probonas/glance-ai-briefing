@@ -8,7 +8,6 @@ import requests
 
 class LLMProvider(Protocol):
     name: str
-    api_key_env: str
     default_model: str
     default_api_url: str
 

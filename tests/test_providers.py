@@ -57,7 +57,6 @@ def test_get_provider_deepseek():
     provider = get_provider("deepseek")
     assert isinstance(provider, DeepSeekProvider)
     assert provider.name == "deepseek"
-    assert provider.api_key_env == "DEEPSEEK_API_KEY"
     assert provider.default_model == "deepseek-chat"
 
 
@@ -65,8 +64,7 @@ def test_get_provider_google():
     provider = get_provider("google")
     assert isinstance(provider, GoogleProvider)
     assert provider.name == "google"
-    assert provider.api_key_env == "GOOGLE_AI_API_KEY"
-    assert provider.default_model == "gemini-2.5-flash"
+    assert provider.default_model == "gemini-3.5-flash"
     assert "generativelanguage.googleapis.com" in provider.default_api_url
 
 

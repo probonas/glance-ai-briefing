@@ -58,10 +58,10 @@ def resolve_provider() -> tuple[LLMProvider, str]:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    api_key = os.environ.get(provider.api_key_env, "")
+    api_key = os.environ.get("LLM_API_KEY", "")
     if not api_key:
         print(
-            f"ERROR: {provider.api_key_env} environment variable not set "
+            f"ERROR: LLM_API_KEY environment variable not set "
             f"(required for LLM_PROVIDER={name})",
             file=sys.stderr,
         )

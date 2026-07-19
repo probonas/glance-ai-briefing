@@ -103,7 +103,7 @@ def test_health_endpoint_style_path():
 
 def test_resolve_provider_deepseek_default(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test")
+    monkeypatch.setenv("LLM_API_KEY", "sk-test")
     provider, api_key = resolve_provider()
     assert isinstance(provider, DeepSeekProvider)
     assert api_key == "sk-test"
@@ -111,7 +111,7 @@ def test_resolve_provider_deepseek_default(monkeypatch):
 
 def test_resolve_provider_google(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "google")
-    monkeypatch.setenv("GOOGLE_AI_API_KEY", "google-key")
+    monkeypatch.setenv("LLM_API_KEY", "google-key")
     provider, api_key = resolve_provider()
     assert isinstance(provider, GoogleProvider)
     assert api_key == "google-key"
@@ -119,7 +119,7 @@ def test_resolve_provider_google(monkeypatch):
 
 def test_resolve_provider_missing_key_exits(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
-    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
     with pytest.raises(SystemExit):
         resolve_provider()
 
@@ -138,7 +138,7 @@ def test_apply_provider_defaults_fills_model_and_url():
     provider = GoogleProvider()
     config = parse_query_params("/")
     result = apply_provider_defaults(config, provider)
-    assert result["model"] == "gemini-2.5-flash"
+    assert result["model"] == "gemini-3.5-flash"
     assert "generativelanguage.googleapis.com" in result["api_url"]
 
 

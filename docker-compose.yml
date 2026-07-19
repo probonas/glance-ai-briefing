@@ -5,8 +5,7 @@ services:
       - "8090:8080"
     environment:
       - LLM_PROVIDER=${LLM_PROVIDER:-deepseek}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - LLM_API_KEY=${LLM_API_KEY}
       - GLANCE_CONFIG=/glance-config/config/home.yml
     volumes:
       - ${GLANCE_CONFIG_DIR:-~/glance-config}:/glance-config:ro

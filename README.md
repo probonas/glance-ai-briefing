@@ -19,14 +19,14 @@ pip install .
 **DeepSeek (default):**
 ```bash
 export LLM_PROVIDER=deepseek
-export DEEPSEEK_API_KEY=sk-...
+export LLM_API_KEY=sk-...
 ```
 Get a key at https://platform.deepseek.com/
 
 **Google AI Studio:**
 ```bash
 export LLM_PROVIDER=google
-export GOOGLE_AI_API_KEY=...
+export LLM_API_KEY=...
 ```
 Get a key at https://aistudio.google.com/
 
@@ -54,8 +54,8 @@ That's it — sensible defaults cover everything. Glance passes any
 ## Docker
 
 ```bash
-export DEEPSEEK_API_KEY=sk-...
-# or: export LLM_PROVIDER=google && export GOOGLE_AI_API_KEY=...
+export LLM_PROVIDER=deepseek  # or: export LLM_PROVIDER=google
+export LLM_API_KEY=sk-...
 docker compose up -d
 ```
 
@@ -103,9 +103,8 @@ cycle — no restart needed.
 The ``LLM_PROVIDER`` environment variable selects the AI backend (``deepseek``
 or ``google``). Defaults to ``deepseek``.
 
-The corresponding API key environment variable (``DEEPSEEK_API_KEY`` or
-``GOOGLE_AI_API_KEY``) is required based on your provider selection and should
-**not** be placed in ``glance.yml`` for security.
+The ``LLM_API_KEY`` environment variable provides the API key for the selected
+provider and should **not** be placed in ``glance.yml`` for security.
 
 ## CLI
 
@@ -120,7 +119,7 @@ briefing refresh --params "story_count=5&model=deepseek-reasoner"  # Override pa
 
 | Symptom                     | Likely cause                                 | Fix                                                                                          |
 |-----------------------------|----------------------------------------------|----------------------------------------------------------------------------------------------|
-| Widget shows nothing        | API key not set                              | ``export DEEPSEEK_API_KEY=sk-...`` or ``export GOOGLE_AI_API_KEY=...``                       |
+| Widget shows nothing        | API key not set                              | ``export LLM_API_KEY=sk-...``                                                               |
 | ``api=error:http401``       | Wrong or expired API key                     | Check your API key for the selected provider                                                 |
 | ``api=error:timeout``       | Network issue or AI provider down            | Wait for next refresh                                                                        |
 | ``No RSS feeds configured`` | Glance config not found                      | Check ``glance_config`` default; override in ``parameters`` or via ``GLANCE_CONFIG`` env var |
