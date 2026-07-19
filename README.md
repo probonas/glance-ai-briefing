@@ -16,11 +16,19 @@ pip install .
 
 ### 2. Set your API key
 
+**DeepSeek (default):**
 ```bash
+export LLM_PROVIDER=deepseek
 export DEEPSEEK_API_KEY=sk-...
 ```
-
 Get a key at https://platform.deepseek.com/
+
+**Google AI Studio:**
+```bash
+export LLM_PROVIDER=google
+export GOOGLE_AI_API_KEY=...
+```
+Get a key at https://aistudio.google.com/
 
 ### 3. Run
 
@@ -47,6 +55,7 @@ That's it — sensible defaults cover everything. Glance passes any
 
 ```bash
 export DEEPSEEK_API_KEY=sk-...
+# or: export LLM_PROVIDER=google && export GOOGLE_AI_API_KEY=...
 docker compose up -d
 ```
 
@@ -73,9 +82,8 @@ Every parameter and its default:
 
 | Parameter              | Default                                          | Notes                                                       |
 |------------------------|--------------------------------------------------|-------------------------------------------------------------|
-| ``provider``           | ``deepseek``                                     | AI provider name                                            |
-| ``model``              | ``deepseek-chat``                                | Model ID                                                    |
-| ``api_url``            | ``https://api.deepseek.com/v1/chat/completions`` | API endpoint                                                |
+| ``model``              | ``deepseek-chat``                                | Model ID (varies by provider)                               |
+| ``api_url``            | ``https://api.deepseek.com/v1/chat/completions`` | API endpoint (varies by provider)                           |
 | ``temperature``        | ``0.3``                                          | LLM temperature                                             |
 | ``timeout_seconds``    | ``30``                                           | API timeout in seconds                                      |
 | ``story_count``        | ``3``                                            | Number of curated stories to return                         |
@@ -92,8 +100,12 @@ The ``GLANCE_CONFIG`` environment variable sets the path to your Glance config
 Changing any parameter in ``glance.yml`` takes effect on the next refresh
 cycle — no restart needed.
 
-The ``DEEPSEEK_API_KEY`` environment variable is required and should **not**
-be placed in ``glance.yml`` for security.
+The ``LLM_PROVIDER`` environment variable selects the AI backend (``deepseek``
+or ``google``). Defaults to ``deepseek``.
+
+The corresponding API key environment variable (``DEEPSEEK_API_KEY`` or
+``GOOGLE_AI_API_KEY``) is required based on your provider selection and should
+**not** be placed in ``glance.yml`` for security.
 
 ## CLI
 
@@ -108,8 +120,8 @@ briefing refresh --params "story_count=5&model=deepseek-reasoner"  # Override pa
 
 | Symptom                     | Likely cause                                 | Fix                                                                                          |
 |-----------------------------|----------------------------------------------|----------------------------------------------------------------------------------------------|
-| Widget shows nothing        | API key not set                              | ``export DEEPSEEK_API_KEY=sk-...``                                                           |
-| ``api=error:http401``       | Wrong or expired API key                     | Check your DeepSeek key                                                                      |
+| Widget shows nothing        | API key not set                              | ``export DEEPSEEK_API_KEY=sk-...`` or ``export GOOGLE_AI_API_KEY=...``                       |
+| ``api=error:http401``       | Wrong or expired API key                     | Check your API key for the selected provider                                                 |
 | ``api=error:timeout``       | Network issue or AI provider down            | Wait for next refresh                                                                        |
 | ``No RSS feeds configured`` | Glance config not found                      | Check ``glance_config`` default; override in ``parameters`` or via ``GLANCE_CONFIG`` env var |
 | Feed changes not picked up  | Normal — feeds re-read on next refresh cycle | Wait up to ``refresh_interval`` seconds                                                      |

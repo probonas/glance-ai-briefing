@@ -5,7 +5,9 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir .
 
+ENV LLM_PROVIDER="deepseek"
 ENV DEEPSEEK_API_KEY=""
+ENV GOOGLE_AI_API_KEY=""
 ENV GLANCE_CONFIG="/glance-config/config/home.yml"
 
 EXPOSE 8080
