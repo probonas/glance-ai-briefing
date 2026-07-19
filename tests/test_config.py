@@ -120,13 +120,13 @@ def test_resolve_provider_google(monkeypatch):
 def test_resolve_provider_missing_key_exits(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("LLM_API_KEY", raising=False)
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="LLM_API_KEY"):
         resolve_provider()
 
 
 def test_resolve_provider_unknown_exits(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "openai")
-    with pytest.raises(SystemExit):
+    with pytest.raises(ValueError, match="Unknown LLM provider"):
         resolve_provider()
 
 

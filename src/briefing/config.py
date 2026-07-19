@@ -9,7 +9,6 @@ The Glance config path (for RSS feed discovery) is *not* a query parameter
 default, because the config file is mounted into the container.
 """
 
-import sys
 import os
 from urllib.parse import urlparse, parse_qs
 
@@ -48,24 +47,18 @@ def resolve_provider() -> tuple[LLMProvider, str]:
         ``(provider, api_key)`` tuple.
 
     Raises:
-        SystemExit: If the provider name is unknown or the required API key
+        RuntimeError: If the provider name is unknown or the required API key
         environment variable is not set.
     """
     name = os.environ.get("LLM_PROVIDER", "deepseek")
-    try:
-        provider = get_provider(name)
-    except ValueError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        sys.exit(1)
+    provider = get_provider(name)
 
     api_key = os.environ.get("LLM_API_KEY", "")
     if not api_key:
-        print(
-            f"ERROR: LLM_API_KEY environment variable not set "
-            f"(required for LLM_PROVIDER={name})",
-            file=sys.stderr,
+        raise RuntimeError(
+            f"LLM_API_KEY environment variable not set "
+            f"(required for LLM_PROVIDER={name})"
         )
-        sys.exit(1)
     return provider, api_key
 
 
