@@ -1,0 +1,40 @@
+name: deploy
+
+on:
+  push:
+    branches: [main, 'dev/**']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cloudflared
+        run: |
+          sudo curl -sL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+          sudo chmod +x /usr/local/bin/cloudflared
+
+      - name: SSH and deploy
+        env:
+          CI_SSH_KEY: ${{ secrets.CI_SSH_KEY }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CLOUDFLARE_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CLOUDFLARE_CLIENT_SECRET }}
+          CI_TUNNEL_HOSTNAME: ${{ secrets.CI_TUNNEL_HOSTNAME }}
+          PI_USER: ${{ secrets.PI_USER }}
+          PI_DEPLOY_DIR: ${{ secrets.PI_DEPLOY_DIR }}
+          PI_REPO_DIR: glance-ai-briefing
+          GIT_BRANCH: ${{ github.ref_name }}
+        run: |
+          echo "$CI_SSH_KEY" > /tmp/ci-key
+          chmod 600 /tmp/ci-key
+          ssh -o StrictHostKeyChecking=no \
+            -o ProxyCommand="cloudflared access ssh --hostname %h" \
+            -i /tmp/ci-key \
+            "$PI_USER@$CI_TUNNEL_HOSTNAME" \
+            "cd $PI_DEPLOY_DIR/$PI_REPO_DIR && git fetch origin && git checkout -f $GIT_BRANCH && git reset --hard origin/$GIT_BRANCH && cd $PI_DEPLOY_DIR && docker compose up --build -d"
+          rm -f /tmp/ci-key
