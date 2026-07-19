@@ -30,7 +30,7 @@ def render_html(stories: list[dict], config: Optional[dict[str, str]] = None) ->
         items += f"""
         <li>
             <a class="size-h3 color-primary-if-not-visited visited-indicator"
-               href="{url}">{headline}</a>
+               href="{url}" target="_blank" rel="noopener noreferrer">{headline}</a>
             <ul class="list-horizontal-text">
                 <li>{source}</li>
                 <li>{summary}</li>
