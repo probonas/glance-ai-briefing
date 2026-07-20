@@ -11,6 +11,9 @@ default, because the config file is mounted into the container.
 
 import os
 from urllib.parse import urlparse, parse_qs
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from briefing.providers import get_provider
 from briefing.providers.base import LLMProvider
