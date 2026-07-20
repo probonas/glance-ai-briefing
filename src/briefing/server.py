@@ -96,6 +96,7 @@ class BriefingServer:
         self._cache = render_empty_state()
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
+        self._retry_count = 0
         self._refresh_thread: threading.Thread | None = None
 
         # Seed the handler's shared config with defaults so the refresh
@@ -138,8 +139,12 @@ class BriefingServer:
         self._stop_event.set()
         self._httpd.shutdown()
 
-    def refresh_now(self) -> None:
-        """Run the full pipeline immediately. Called by the background thread."""
+    def refresh_now(self) -> bool:
+        """Run one pipeline attempt.  Called by the background thread.
+
+        Returns:
+            True on success (new stories cached), False otherwise.
+        """
         config = apply_provider_defaults(_BriefingHandler.latest_config, self._provider)
         try:
             logger.info("Refresh cycle starting")
@@ -148,7 +153,7 @@ class BriefingServer:
                 logger.warning("No RSS feeds found in Glance config")
                 if "<p" not in self.cache:
                     self.set_cache(render_empty_state())
-                return
+                return False
 
             headlines, fetched = fetch_headlines(
                 feed_urls, limit=int(config["headlines_per_feed"])
@@ -158,17 +163,20 @@ class BriefingServer:
 
             if not headlines:
                 logger.warning("No headlines fetched — keeping previous cache")
-                return
+                return False
 
             stories = curate(headlines, config, self._provider, self._api_key)
             if stories:
                 html = render_html(stories, config)
                 self.set_cache(html)
                 logger.info("Refresh complete — %d stories cached", len(stories))
+                return True
             else:
                 logger.warning("No stories returned from AI — keeping previous cache")
+                return False
         except Exception:
             logger.exception("Refresh cycle failed")
+            return False
 
     @classmethod
     def is_silent_hours(cls, now: datetime | None = None) -> bool:
@@ -196,12 +204,20 @@ class BriefingServer:
             # before running the first refresh cycle.
             logger.info("Waiting for Glance config parameters...")
             _BriefingHandler.config_ready.wait()
-            self.refresh_now()
-            while not self._stop_event.wait(
-                int(_BriefingHandler.latest_config["refresh_interval"])
-            ):
+            success = self.refresh_now()
+            self._retry_count = 0 if success else 1
+
+            while not self._stop_event.is_set():
+                interval = int(_BriefingHandler.latest_config["refresh_interval"])
+                if self._retry_count > 0:
+                    wait = min(interval, 2 * (2 ** (self._retry_count - 1)))
+                else:
+                    wait = interval
+                if self._stop_event.wait(wait):
+                    break
                 if not self.is_silent_hours():
-                    self.refresh_now()
+                    success = self.refresh_now()
+                    self._retry_count = 0 if success else self._retry_count + 1
                 else:
                     logger.info("Silent hours. Skipped refreshing...")
 
