@@ -1,5 +1,6 @@
 services:
   briefing:
+    container_name: briefing
     build: .
     ports:
       - "8090:8080"
