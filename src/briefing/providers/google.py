@@ -5,7 +5,7 @@ from briefing.providers.base import _call_openai_compatible
 @dataclass(frozen=True)
 class GoogleProvider:
     name: str = "google"
-    default_model: str = "gemini-3.5-flash"
+    default_model: str = "gemini-3.5-flash-lite"
     default_api_url: str = (
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
     )
